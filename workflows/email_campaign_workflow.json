@@ -1,0 +1,437 @@
+{
+  "name": "Email Campaign Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c5e8d5e1-8f5a-4b5e-9c5d-1a2b3c4d5e6f",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "binaryPropertyName": "data",
+        "options": {
+          "delimiter": ",",
+          "headerRow": true
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Read CSV File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "notes": "Reads CSV file with email addresses. Expected columns: email, first_name, last_name"
+    },
+    {
+      "parameters": {
+        "mode": "jsonToCsv",
+        "options": {
+          "fileName": "email_list.csv"
+        }
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Parse CSV",
+      "type": "n8n-nodes-base.moveBinaryData",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "notes": "Parses CSV data into JSON format for processing"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract email data from CSV\nconst items = [];\n\nfor (const item of $input.all()) {\n  const email = item.json.email;\n  const firstName = item.json.first_name || '';\n  const lastName = item.json.last_name || '';\n  \n  if (email && email.includes('@')) {\n    items.push({\n      json: {\n        email: email.trim(),\n        firstName: firstName.trim(),\n        lastName: lastName.trim(),\n        fullName: `${firstName} ${lastName}`.trim(),\n        timestamp: new Date().toISOString()\n      }\n    });\n  }\n}\n\nreturn items;"
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Process Email List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "notes": "Validates and processes email addresses from CSV"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.testMode}}",
+              "operation": "equals",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "id": "d4e5f6a7-b8c9-0123-def1-234567890123",
+      "name": "Test Mode Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "notes": "Checks if workflow is in test mode"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filter to test emails only\nconst testEmails = $json.testEmails ? $json.testEmails.split(',').map(e => e.trim()) : [];\n\nif (testEmails.length > 0 && testEmails.includes($json.email)) {\n  return [{ json: $json }];\n}\n\nreturn [];"
+      },
+      "id": "e5f6a7b8-c9d0-1234-ef12-345678901234",
+      "name": "Filter Test Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200],
+      "notes": "Filters to only test email addresses when in test mode"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare email content using template\nconst template = $node[\"Load Email Template\"].json.template || 'Hello {{firstName}},\\n\\nThis is a test email.\\n\\nBest regards';\n\nlet emailBody = template;\nemailBody = emailBody.replace(/{{firstName}}/g, $json.firstName || 'there');\nemailBody = emailBody.replace(/{{lastName}}/g, $json.lastName || '');\nemailBody = emailBody.replace(/{{fullName}}/g, $json.fullName || 'there');\nemailBody = emailBody.replace(/{{email}}/g, $json.email);\n\nconst subject = $node[\"Load Email Template\"].json.subject || 'Email Campaign';\n\nreturn {\n  json: {\n    ...($json),\n    emailSubject: subject,\n    emailBody: emailBody,\n    campaignId: $workflow.id,\n    sendTime: new Date().toISOString()\n  }\n};"
+      },
+      "id": "f6a7b8c9-d0e1-2345-f123-456789012345",
+      "name": "Prepare Email Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300],
+      "notes": "Applies email template with personalization"
+    },
+    {
+      "parameters": {
+        "authentication": "smtp",
+        "fromEmail": "={{$json.senderEmail || 'noreply@example.com'}}",
+        "toEmail": "={{$json.email}}",
+        "subject": "={{$json.emailSubject}}",
+        "emailType": "text",
+        "message": "={{$json.emailBody}}",
+        "options": {
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "a7b8c9d0-e1f2-3456-1234-567890123456",
+      "name": "Send Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1650, 300],
+      "notes": "Sends email via SMTP. Configure credentials in n8n settings.",
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Track email delivery status\nconst status = {\n  email: $json.email,\n  status: 'sent',\n  sentAt: new Date().toISOString(),\n  campaignId: $json.campaignId,\n  subject: $json.emailSubject,\n  recipient: {\n    firstName: $json.firstName,\n    lastName: $json.lastName\n  }\n};\n\nreturn { json: status };"
+      },
+      "id": "b8c9d0e1-f2a3-4567-2345-678901234567",
+      "name": "Track Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300],
+      "notes": "Records successful email delivery"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Track email delivery errors\nconst errorStatus = {\n  email: $json.email || 'unknown',\n  status: 'error',\n  error: $json.error || 'Unknown error',\n  failedAt: new Date().toISOString(),\n  campaignId: $json.campaignId\n};\n\nreturn { json: errorStatus };"
+      },
+      "id": "c9d0e1f2-a3b4-5678-3456-789012345678",
+      "name": "Track Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 450],
+      "notes": "Records email delivery errors"
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "insert",
+        "table": "email_campaign_log",
+        "columns": "email,status,sent_at,campaign_id,subject,error",
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-6789-4567-890123456789",
+      "name": "Save to Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2050, 375],
+      "notes": "Saves delivery status to database. Can be replaced with other storage nodes (MySQL, MongoDB, etc.)",
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "PostgreSQL Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ { \"template\": $json.emailTemplate, \"subject\": $json.emailSubject } }}"
+      },
+      "id": "e1f2a3b4-c5d6-7890-5678-901234567890",
+      "name": "Load Email Template",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [1250, 400],
+      "notes": "Loads email template. Can be replaced with HTTP Request to fetch from external template service."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "f2a3b4c5-d6e7-8901-6789-012345678901",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 500],
+      "notes": "Optional: Triggers workflow on schedule (daily at 9 AM). Disable if using manual trigger only."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "email-campaign",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "a3b4c5d6-e7f8-9012-7890-123456789012",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 100],
+      "notes": "Optional: Triggers workflow via webhook. POST with JSON body containing campaign parameters."
+    },
+    {
+      "parameters": {
+        "functionCode": "// Aggregate campaign statistics\nconst allItems = $input.all();\nconst stats = {\n  total: allItems.length,\n  sent: allItems.filter(i => i.json.status === 'sent').length,\n  errors: allItems.filter(i => i.json.status === 'error').length,\n  campaignId: allItems[0]?.json.campaignId,\n  completedAt: new Date().toISOString()\n};\n\nreturn { json: stats };"
+      },
+      "id": "b4c5d6e7-f8a9-0123-8901-234567890123",
+      "name": "Campaign Statistics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 375],
+      "notes": "Aggregates campaign delivery statistics"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.webhookUrl || 'https://example.com/webhook'}}",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify($json) }}"
+      },
+      "id": "c5d6e7f8-a9b0-1234-9012-345678901234",
+      "name": "Send Statistics Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2450, 375],
+      "notes": "Optional: Sends campaign statistics to external webhook"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Read CSV File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read CSV File": {
+      "main": [
+        [
+          {
+            "node": "Parse CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse CSV": {
+      "main": [
+        [
+          {
+            "node": "Process Email List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Email List": {
+      "main": [
+        [
+          {
+            "node": "Test Mode Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Load Email Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Mode Check": {
+      "main": [
+        [
+          {
+            "node": "Filter Test Emails",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Test Emails": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Email Template": {
+      "main": [
+        []
+      ]
+    },
+    "Prepare Email Content": {
+      "main": [
+        [
+          {
+            "node": "Send Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Track Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Track Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Success": {
+      "main": [
+        [
+          {
+            "node": "Save to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Error": {
+      "main": [
+        [
+          {
+            "node": "Save to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Database": {
+      "main": [
+        [
+          {
+            "node": "Campaign Statistics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Campaign Statistics": {
+      "main": [
+        [
+          {
+            "node": "Send Statistics Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read CSV File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read CSV File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "email",
+      "id": "1"
+    },
+    {
+      "name": "campaign",
+      "id": "2"
+    },
+    {
+      "name": "automation",
+      "id": "3"
+    }
+  ],
+  "pinData": {},
+  "versionId": "1.0.0",
+  "triggerCount": 0,
+  "active": false
+}

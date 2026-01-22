@@ -1,0 +1,350 @@
+{
+  "name": "VK Content Publishing Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "cron-node",
+      "name": "Schedule: Daily Content Publishing",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Triggers workflow daily at scheduled time"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare content data for VK post\nconst contentData = {\n  message: items[0].json.message || 'Default content message',\n  attachments: items[0].json.attachments || '',\n  publishDate: new Date().toISOString(),\n  owner_id: items[0].json.owner_id || '', // Group or user ID\n  from_group: items[0].json.from_group || 1 // Post on behalf of group\n};\n\n// Add optional parameters if provided\nif (items[0].json.link) {\n  contentData.attachments += (contentData.attachments ? ',' : '') + items[0].json.link;\n}\n\nif (items[0].json.lat && items[0].json.long) {\n  contentData.lat = items[0].json.lat;\n  contentData.long = items[0].json.long;\n}\n\nreturn [{\n  json: contentData\n}];"
+      },
+      "id": "function-prepare-data",
+      "name": "Prepare Post Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Prepares and validates data before posting to VK"
+    },
+    {
+      "parameters": {
+        "url": "https://api.vk.com/method/wall.post",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{$credentials.vkAccessToken}}"
+            },
+            {
+              "name": "v",
+              "value": "5.131"
+            },
+            {
+              "name": "owner_id",
+              "value": "={{$json.owner_id}}"
+            },
+            {
+              "name": "from_group",
+              "value": "={{$json.from_group}}"
+            },
+            {
+              "name": "message",
+              "value": "={{$json.message}}"
+            },
+            {
+              "name": "attachments",
+              "value": "={{$json.attachments}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "http-vk-post",
+      "name": "VK API: Publish Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        650,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Posts content to VK wall using VK API"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check VK API response for errors\nconst response = items[0].json;\n\nif (response.error) {\n  throw new Error(`VK API Error: ${response.error.error_msg} (Code: ${response.error.error_code})`);\n}\n\nif (!response.response || !response.response.post_id) {\n  throw new Error('VK API: Post ID not returned');\n}\n\n// Return success data\nreturn [{\n  json: {\n    success: true,\n    post_id: response.response.post_id,\n    timestamp: new Date().toISOString(),\n    message: 'Post published successfully'\n  }\n}];"
+      },
+      "id": "function-check-response",
+      "name": "Validate Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Validates VK API response and extracts post ID"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log successful publication\nconst logEntry = {\n  status: 'SUCCESS',\n  post_id: items[0].json.post_id,\n  timestamp: items[0].json.timestamp,\n  message: items[0].json.message,\n  workflow_execution_id: $executionId\n};\n\nconsole.log('VK Post Published:', JSON.stringify(logEntry, null, 2));\n\nreturn [{\n  json: logEntry\n}];"
+      },
+      "id": "function-log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        250
+      ],
+      "notesInFlow": true,
+      "notes": "Logs successful post publication"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log error details\nconst errorLog = {\n  status: 'ERROR',\n  error_message: $json.error?.message || 'Unknown error',\n  timestamp: new Date().toISOString(),\n  workflow_execution_id: $executionId,\n  input_data: items[0].json\n};\n\nconsole.error('VK Post Failed:', JSON.stringify(errorLog, null, 2));\n\nreturn [{\n  json: errorLog\n}];"
+      },
+      "id": "function-log-error",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        450
+      ],
+      "notesInFlow": true,
+      "notes": "Logs errors when post publication fails"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll"
+      },
+      "id": "merge-logs",
+      "name": "Merge Logs",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        350
+      ],
+      "notesInFlow": true,
+      "notes": "Combines success and error logs for final output"
+    },
+    {
+      "parameters": {
+        "url": "https://api.vk.com/method/wall.get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{$credentials.vkAccessToken}}"
+            },
+            {
+              "name": "v",
+              "value": "5.131"
+            },
+            {
+              "name": "owner_id",
+              "value": "={{$json.owner_id}}"
+            },
+            {
+              "name": "count",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "http-verify-post",
+      "name": "VK API: Verify Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        850,
+        150
+      ],
+      "notesInFlow": true,
+      "notes": "Optional: Verifies that the post was published successfully"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-success",
+              "leftValue": "={{$json.success}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-success",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule: Daily Content Publishing": {
+      "main": [
+        [
+          {
+            "node": "Prepare Post Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Post Data": {
+      "main": [
+        [
+          {
+            "node": "VK API: Publish Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK API: Publish Post": {
+      "main": [
+        [
+          {
+            "node": "Validate Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Response": {
+      "main": [
+        [
+          {
+            "node": "Check Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "VK API: Verify Post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Merge Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Merge Logs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2026-01-22T00:00:00.000Z",
+      "updatedAt": "2026-01-22T00:00:00.000Z",
+      "id": "vk-automation",
+      "name": "VK Automation"
+    },
+    {
+      "createdAt": "2026-01-22T00:00:00.000Z",
+      "updatedAt": "2026-01-22T00:00:00.000Z",
+      "id": "content-publishing",
+      "name": "Content Publishing"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-22T00:00:00.000Z",
+  "versionId": "1.0.0",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "n8n-vk-workflow-instance"
+  }
+}

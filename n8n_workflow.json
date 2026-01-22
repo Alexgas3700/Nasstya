@@ -1,0 +1,425 @@
+{
+  "name": "VK Content Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "",
+      "notesInFlow": true,
+      "notes": "Запускается каждые 2 часа. Настройте расписание под свои нужды."
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "vk_access_token",
+              "value": "={{ $env.VK_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "vk_group_id",
+              "value": "={{ $env.VK_GROUP_ID }}"
+            },
+            {
+              "name": "post_text",
+              "value": "Это автоматическая публикация через n8n! 🚀\n\nВремя публикации: {{ $now.format('DD.MM.YYYY HH:mm') }}\n\n#автоматизация #n8n #vk"
+            },
+            {
+              "name": "publish_date",
+              "value": "={{ $now.plus({hours: 1}).toUnixInteger() }}"
+            },
+            {
+              "name": "api_version",
+              "value": "5.131"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-variables",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Настройка переменных для публикации. VK_ACCESS_TOKEN и VK_GROUP_ID должны быть установлены в Environment Variables."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Функция для подготовки данных к публикации в VK\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const vkAccessToken = item.json.vk_access_token;\n  const vkGroupId = item.json.vk_group_id;\n  const postText = item.json.post_text;\n  const publishDate = item.json.publish_date;\n  const apiVersion = item.json.api_version;\n\n  // Проверка наличия обязательных параметров\n  if (!vkAccessToken || !vkGroupId) {\n    throw new Error('VK_ACCESS_TOKEN и VK_GROUP_ID должны быть установлены в переменных окружения');\n  }\n\n  // Формирование параметров для VK API\n  const vkParams = {\n    owner_id: `-${vkGroupId}`,\n    message: postText,\n    from_group: 1,\n    publish_date: publishDate,\n    access_token: vkAccessToken,\n    v: apiVersion\n  };\n\n  results.push({\n    json: {\n      vk_params: vkParams,\n      vk_access_token: vkAccessToken,\n      vk_group_id: vkGroupId,\n      api_version: apiVersion,\n      post_text: postText,\n      publish_timestamp: publishDate,\n      prepared_at: new Date().toISOString()\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "prepare-data",
+      "name": "Prepare VK Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Подготовка данных для отправки в VK API. Формирование параметров запроса."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vk.com/method/wall.post",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "owner_id",
+              "value": "={{ $json.vk_params.owner_id }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.vk_params.message }}"
+            },
+            {
+              "name": "from_group",
+              "value": "={{ $json.vk_params.from_group }}"
+            },
+            {
+              "name": "publish_date",
+              "value": "={{ $json.vk_params.publish_date }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $json.vk_params.access_token }}"
+            },
+            {
+              "name": "v",
+              "value": "={{ $json.vk_params.v }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "vk-publish",
+      "name": "Publish to VK",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        850,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Публикация поста в VK через wall.post API метод."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-check",
+              "leftValue": "={{ $json.response }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-response",
+      "name": "Check Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Проверка успешности публикации."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Обработка успешной публикации и создание лога\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const response = item.json.response || {};\n  const postId = response.post_id || 'unknown';\n  \n  const logEntry = {\n    status: 'success',\n    post_id: postId,\n    published_at: new Date().toISOString(),\n    scheduled_for: item.json.publish_timestamp,\n    post_text: item.json.post_text,\n    vk_group_id: item.json.vk_group_id,\n    vk_response: response\n  };\n  \n  results.push({\n    json: logEntry\n  });\n}\n\nreturn results;"
+      },
+      "id": "log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        200
+      ],
+      "notesInFlow": true,
+      "notes": "Логирование успешной публикации."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Обработка ошибки публикации и создание лога\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const error = item.json.error || {};\n  \n  const logEntry = {\n    status: 'error',\n    error_code: error.error_code || 'unknown',\n    error_msg: error.error_msg || 'Unknown error',\n    failed_at: new Date().toISOString(),\n    post_text: item.json.post_text,\n    vk_group_id: item.json.vk_group_id,\n    vk_response: item.json\n  };\n  \n  results.push({\n    json: logEntry\n  });\n}\n\nreturn results;"
+      },
+      "id": "log-error",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        400
+      ],
+      "notesInFlow": true,
+      "notes": "Логирование ошибки публикации."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "save-to-sheet",
+      "name": "Save Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [
+        1450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Сохранение логов в Google Sheets. Опционально - можно заменить на другое хранилище.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vk.com/method/photos.getWallUploadServer",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "group_id",
+              "value": "={{ $json.vk_group_id }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $json.vk_access_token }}"
+            },
+            {
+              "name": "v",
+              "value": "={{ $json.api_version }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "get-upload-server",
+      "name": "Get Upload Server (for images)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        650,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Получение URL для загрузки изображений. Используется при необходимости прикрепить фото к посту.",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "webhook-info",
+              "name": "webhook_url",
+              "value": "={{ $execution.resumeUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "manual-trigger-info",
+              "name": "info",
+              "value": "Этот workflow можно запустить вручную или по расписанию",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "manual-trigger",
+      "name": "Manual Trigger (Alternative)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        250,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Альтернативный триггер для ручного запуска workflow.",
+      "disabled": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Prepare VK Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare VK Data": {
+      "main": [
+        [
+          {
+            "node": "Publish to VK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Upload Server (for images)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to VK": {
+      "main": [
+        [
+          {
+            "node": "Check Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Response": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Save Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Save Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1.0.0",
+  "id": "vk-content-publisher",
+  "meta": {
+    "instanceId": "n8n-vk-workflow"
+  },
+  "tags": [
+    {
+      "createdAt": "2026-01-22T00:00:00.000Z",
+      "updatedAt": "2026-01-22T00:00:00.000Z",
+      "id": "vk-automation",
+      "name": "VK Automation"
+    },
+    {
+      "createdAt": "2026-01-22T00:00:00.000Z",
+      "updatedAt": "2026-01-22T00:00:00.000Z",
+      "id": "social-media",
+      "name": "Social Media"
+    }
+  ]
+}

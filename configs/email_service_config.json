@@ -1,0 +1,189 @@
+{
+  "emailServices": {
+    "smtp": {
+      "enabled": true,
+      "description": "Standard SMTP configuration for email sending",
+      "config": {
+        "host": "smtp.example.com",
+        "port": 587,
+        "secure": false,
+        "auth": {
+          "user": "your-email@example.com",
+          "pass": "your-password-or-app-password"
+        },
+        "tls": {
+          "rejectUnauthorized": true
+        }
+      },
+      "rateLimit": {
+        "maxEmailsPerHour": 500,
+        "maxEmailsPerDay": 10000,
+        "batchSize": 10,
+        "delayBetweenBatches": 1000
+      },
+      "notes": "Configure your SMTP credentials in n8n credentials manager"
+    },
+    "sendgrid": {
+      "enabled": false,
+      "description": "SendGrid API integration for reliable email delivery",
+      "config": {
+        "apiKey": "YOUR_SENDGRID_API_KEY",
+        "fromEmail": "noreply@yourdomain.com",
+        "fromName": "Your Company Name"
+      },
+      "rateLimit": {
+        "maxEmailsPerSecond": 100,
+        "maxEmailsPerDay": 100000,
+        "batchSize": 50,
+        "delayBetweenBatches": 500
+      },
+      "features": {
+        "tracking": true,
+        "clickTracking": true,
+        "openTracking": true,
+        "unsubscribeTracking": true
+      },
+      "notes": "Get API key from https://app.sendgrid.com/settings/api_keys"
+    },
+    "mailgun": {
+      "enabled": false,
+      "description": "Mailgun API integration for transactional emails",
+      "config": {
+        "apiKey": "YOUR_MAILGUN_API_KEY",
+        "domain": "yourdomain.com",
+        "region": "us"
+      },
+      "rateLimit": {
+        "maxEmailsPerHour": 1000,
+        "maxEmailsPerDay": 50000,
+        "batchSize": 20,
+        "delayBetweenBatches": 800
+      },
+      "notes": "Get credentials from https://app.mailgun.com/app/account/security/api_keys"
+    },
+    "amazonSES": {
+      "enabled": false,
+      "description": "Amazon Simple Email Service for scalable email sending",
+      "config": {
+        "region": "us-east-1",
+        "accessKeyId": "YOUR_AWS_ACCESS_KEY_ID",
+        "secretAccessKey": "YOUR_AWS_SECRET_ACCESS_KEY",
+        "fromEmail": "noreply@yourdomain.com"
+      },
+      "rateLimit": {
+        "maxEmailsPerSecond": 14,
+        "maxEmailsPerDay": 50000,
+        "batchSize": 10,
+        "delayBetweenBatches": 1000
+      },
+      "notes": "Requires verified domain and email addresses in AWS SES console"
+    }
+  },
+  "campaignSettings": {
+    "defaultSender": {
+      "email": "noreply@example.com",
+      "name": "Campaign Team"
+    },
+    "defaultSubject": "Newsletter from Campaign Team",
+    "defaultTemplate": "template_example",
+    "timezone": "Europe/Moscow",
+    "scheduling": {
+      "allowedDays": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      "allowedHours": {
+        "start": 9,
+        "end": 18
+      },
+      "defaultSchedule": "0 9 * * 1"
+    },
+    "retryPolicy": {
+      "maxRetries": 3,
+      "retryDelay": 300000,
+      "exponentialBackoff": true
+    }
+  },
+  "mailingLists": {
+    "storage": {
+      "type": "csv",
+      "path": "/data/mailing_lists/",
+      "format": {
+        "delimiter": ",",
+        "encoding": "utf-8",
+        "requiredFields": ["email", "firstName", "lastName"],
+        "optionalFields": ["customField1", "customField2", "subscriptionDate", "tags"]
+      }
+    },
+    "validation": {
+      "validateEmailFormat": true,
+      "checkDuplicates": true,
+      "allowUnsubscribed": false
+    }
+  },
+  "templates": {
+    "storage": {
+      "path": "/workspace/templates/",
+      "format": "html"
+    },
+    "availableTemplates": [
+      {
+        "name": "template_example",
+        "file": "template_example.html",
+        "description": "Основной шаблон с градиентным дизайном",
+        "variables": ["firstName", "lastName", "email", "customField1", "customField2", "unsubscribeLink"]
+      },
+      {
+        "name": "template_welcome",
+        "file": "template_welcome.html",
+        "description": "Приветственное письмо для новых пользователей",
+        "variables": ["firstName", "lastName", "unsubscribeLink"]
+      },
+      {
+        "name": "template_newsletter",
+        "file": "template_newsletter.html",
+        "description": "Шаблон новостной рассылки",
+        "variables": ["firstName", "email", "customField1", "customField2", "unsubscribeLink"]
+      }
+    ]
+  },
+  "logging": {
+    "enabled": true,
+    "logSuccessful": true,
+    "logErrors": true,
+    "logPath": "/data/logs/",
+    "logFormat": "json",
+    "retention": {
+      "successLogs": 30,
+      "errorLogs": 90
+    }
+  },
+  "notifications": {
+    "adminEmail": "admin@example.com",
+    "notifyOnCampaignStart": true,
+    "notifyOnCampaignComplete": true,
+    "notifyOnErrors": true,
+    "errorThreshold": 10
+  },
+  "security": {
+    "encryptCredentials": true,
+    "useSSL": true,
+    "allowedDomains": ["example.com", "yourdomain.com"],
+    "rateLimitProtection": true,
+    "spamProtection": {
+      "enabled": true,
+      "maxRecipientsPerCampaign": 10000,
+      "requireDoubleOptIn": false
+    }
+  },
+  "compliance": {
+    "gdpr": {
+      "enabled": true,
+      "includeUnsubscribeLink": true,
+      "includePrivacyPolicy": true,
+      "dataRetentionDays": 365
+    },
+    "canSpam": {
+      "enabled": true,
+      "includePhysicalAddress": true,
+      "physicalAddress": "123 Business St, City, Country"
+    }
+  }
+}

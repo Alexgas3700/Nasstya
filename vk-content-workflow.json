@@ -1,0 +1,483 @@
+{
+  "name": "VK Content Publishing Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Запуск публикации каждый день в 9:00 UTC. Можно настроить на нужное время."
+    },
+    {
+      "parameters": {
+        "functionCode": "// Подготовка данных для публикации в VK\n// Здесь можно настроить текст, изображения и другие параметры\n\nconst postData = {\n  message: $input.first().json.message || 'Новый пост от n8n!',\n  attachments: $input.first().json.attachments || [],\n  publish_date: $input.first().json.publish_date || Math.floor(Date.now() / 1000),\n  from_group: $input.first().json.from_group || 1,\n  signed: $input.first().json.signed || 0\n};\n\n// Логирование подготовленных данных\nconsole.log('Подготовленные данные для публикации:', postData);\n\nreturn {\n  json: postData\n};"
+      },
+      "id": "prepare-data",
+      "name": "Prepare Post Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Подготовка данных для публикации: текст, вложения, время публикации"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "https://api.vk.com/method/wall.post",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "access_token",
+                "value": "={{$credentials.vk_access_token}}"
+              },
+              {
+                "name": "v",
+                "value": "5.131"
+              },
+              {
+                "name": "owner_id",
+                "value": "={{$credentials.vk_owner_id}}"
+              },
+              {
+                "name": "message",
+                "value": "={{$json.message}}"
+              },
+              {
+                "name": "from_group",
+                "value": "={{$json.from_group}}"
+              },
+              {
+                "name": "signed",
+                "value": "={{$json.signed}}"
+              },
+              {
+                "name": "publish_date",
+                "value": "={{$json.publish_date}}"
+              }
+            ]
+          }
+        },
+        "sendBody": false
+      },
+      "id": "vk-post-text",
+      "name": "VK Post Text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        650,
+        200
+      ],
+      "notesInFlow": true,
+      "notes": "Публикация текстового контента в VK через API"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Проверка наличия изображений для загрузки\nconst attachments = $input.first().json.attachments || [];\nconst images = attachments.filter(att => att.type === 'photo');\n\nif (images.length === 0) {\n  // Если нет изображений, пропускаем этот узел\n  return [];\n}\n\n// Возвращаем данные для загрузки изображений\nreturn images.map(img => ({\n  json: {\n    image_url: img.url,\n    image_description: img.description || ''\n  }\n}));"
+      },
+      "id": "check-images",
+      "name": "Check Images",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        650,
+        400
+      ],
+      "notesInFlow": true,
+      "notes": "Проверка наличия изображений для загрузки"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "https://api.vk.com/method/photos.getWallUploadServer",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "access_token",
+                "value": "={{$credentials.vk_access_token}}"
+              },
+              {
+                "name": "v",
+                "value": "5.131"
+              },
+              {
+                "name": "group_id",
+                "value": "={{$credentials.vk_group_id}}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "vk-get-upload-server",
+      "name": "VK Get Upload Server",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        850,
+        400
+      ],
+      "notesInFlow": true,
+      "notes": "Получение URL сервера для загрузки изображений"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.response.upload_url}}",
+        "options": {
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "photo",
+                "value": "={{$binary.data}}"
+              }
+            ]
+          }
+        },
+        "sendBody": true
+      },
+      "id": "vk-upload-photo",
+      "name": "VK Upload Photo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1050,
+        400
+      ],
+      "notesInFlow": true,
+      "notes": "Загрузка изображения на сервер VK"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "https://api.vk.com/method/photos.saveWallPhoto",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "access_token",
+                "value": "={{$credentials.vk_access_token}}"
+              },
+              {
+                "name": "v",
+                "value": "5.131"
+              },
+              {
+                "name": "group_id",
+                "value": "={{$credentials.vk_group_id}}"
+              },
+              {
+                "name": "photo",
+                "value": "={{$json.photo}}"
+              },
+              {
+                "name": "server",
+                "value": "={{$json.server}}"
+              },
+              {
+                "name": "hash",
+                "value": "={{$json.hash}}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "vk-save-photo",
+      "name": "VK Save Photo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        400
+      ],
+      "notesInFlow": true,
+      "notes": "Сохранение загруженного изображения в VK"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Проверка наличия видео для загрузки\nconst attachments = $input.first().json.attachments || [];\nconst videos = attachments.filter(att => att.type === 'video');\n\nif (videos.length === 0) {\n  // Если нет видео, пропускаем этот узел\n  return [];\n}\n\n// Возвращаем данные для загрузки видео\nreturn videos.map(vid => ({\n  json: {\n    video_url: vid.url,\n    video_name: vid.name || 'Video from n8n',\n    video_description: vid.description || ''\n  }\n}));"
+      },
+      "id": "check-videos",
+      "name": "Check Videos",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        650,
+        600
+      ],
+      "notesInFlow": true,
+      "notes": "Проверка наличия видео для загрузки"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "https://api.vk.com/method/video.save",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "access_token",
+                "value": "={{$credentials.vk_access_token}}"
+              },
+              {
+                "name": "v",
+                "value": "5.131"
+              },
+              {
+                "name": "group_id",
+                "value": "={{$credentials.vk_group_id}}"
+              },
+              {
+                "name": "name",
+                "value": "={{$json.video_name}}"
+              },
+              {
+                "name": "description",
+                "value": "={{$json.video_description}}"
+              },
+              {
+                "name": "is_private",
+                "value": "0"
+              },
+              {
+                "name": "wallpost",
+                "value": "1"
+              }
+            ]
+          }
+        }
+      },
+      "id": "vk-save-video",
+      "name": "VK Save Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        850,
+        600
+      ],
+      "notesInFlow": true,
+      "notes": "Получение URL для загрузки видео в VK"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.response.upload_url}}",
+        "options": {
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "video_file",
+                "value": "={{$binary.data}}"
+              }
+            ]
+          }
+        },
+        "sendBody": true
+      },
+      "id": "vk-upload-video",
+      "name": "VK Upload Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1050,
+        600
+      ],
+      "notesInFlow": true,
+      "notes": "Загрузка видео на сервер VK"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Логирование результатов публикации\nconst input = $input.all();\nconst timestamp = new Date().toISOString();\n\nconst logData = {\n  timestamp: timestamp,\n  status: 'success',\n  post_id: input[0]?.json?.response?.post_id || 'unknown',\n  message: 'Публикация успешно выполнена',\n  details: {\n    text_posted: input.some(item => item.json?.response?.post_id),\n    images_uploaded: input.filter(item => item.json?.response?.photo).length,\n    videos_uploaded: input.filter(item => item.json?.response?.video_id).length\n  }\n};\n\nconsole.log('=== LOG PUBLICATION ===');\nconsole.log(JSON.stringify(logData, null, 2));\nconsole.log('======================');\n\nreturn {\n  json: logData\n};"
+      },
+      "id": "log-publication",
+      "name": "Log Publication",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Логирование результатов публикации"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Обработка ошибок при публикации\nconst error = $input.first().json.error || {};\nconst timestamp = new Date().toISOString();\n\nconst errorLog = {\n  timestamp: timestamp,\n  status: 'error',\n  error_code: error.error_code || 'unknown',\n  error_msg: error.error_msg || 'Unknown error occurred',\n  request_params: error.request_params || []\n};\n\nconsole.error('=== ERROR LOG ===');\nconsole.error(JSON.stringify(errorLog, null, 2));\nconsole.error('=================');\n\nreturn {\n  json: errorLog\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Обработка и логирование ошибок"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Post Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Post Data": {
+      "main": [
+        [
+          {
+            "node": "VK Post Text",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Images",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK Post Text": {
+      "main": [
+        [
+          {
+            "node": "Log Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Images": {
+      "main": [
+        [
+          {
+            "node": "VK Get Upload Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK Get Upload Server": {
+      "main": [
+        [
+          {
+            "node": "VK Upload Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK Upload Photo": {
+      "main": [
+        [
+          {
+            "node": "VK Save Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK Save Photo": {
+      "main": [
+        [
+          {
+            "node": "Log Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Videos": {
+      "main": [
+        [
+          {
+            "node": "VK Save Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK Save Video": {
+      "main": [
+        [
+          {
+            "node": "VK Upload Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK Upload Video": {
+      "main": [
+        [
+          {
+            "node": "Log Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2026-01-22T00:00:00.000Z",
+      "updatedAt": "2026-01-22T00:00:00.000Z",
+      "id": "1",
+      "name": "VK"
+    },
+    {
+      "createdAt": "2026-01-22T00:00:00.000Z",
+      "updatedAt": "2026-01-22T00:00:00.000Z",
+      "id": "2",
+      "name": "Social Media"
+    }
+  ],
+  "pinData": {},
+  "versionId": "1.0.0"
+}

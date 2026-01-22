@@ -1,0 +1,5 @@
+email,firstName,lastName,customField1,customField2,subscriptionDate,tags
+john.doe@example.com,John,Doe,Premium User,Active,2026-01-15,customer;active
+jane.smith@example.com,Jane,Smith,Standard User,Active,2026-01-18,customer;newsletter
+alex.johnson@example.com,Alex,Johnson,VIP User,Active,2026-01-10,vip;priority
+maria.garcia@example.com,Maria,Garcia,Trial User,Pending,2026-01-20,trial;new

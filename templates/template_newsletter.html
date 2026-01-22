@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Новостная рассылка</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #e9ecef;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: #ffffff;
+            padding: 25px;
+            text-align: center;
+        }
+        .article {
+            padding: 25px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .article h2 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .article-date {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .read-more {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .footer {
+            background-color: #34495e;
+            color: #ecf0f1;
+            padding: 25px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📰 Новостная рассылка</h1>
+            <p>Еженедельный дайджест новостей</p>
+        </div>
+        
+        <div class="article">
+            <div class="article-date">21 января 2026</div>
+            <h2>Главная новость недели</h2>
+            <p>Привет, {{firstName}}! Вот самые интересные события этой недели, которые мы подготовили специально для вас.</p>
+            <p>{{customField1}}</p>
+            <a href="https://example.com/article1" class="read-more">Читать далее →</a>
+        </div>
+        
+        <div class="article">
+            <div class="article-date">20 января 2026</div>
+            <h2>Обновления продукта</h2>
+            <p>Мы выпустили новые функции, которые сделают вашу работу еще удобнее.</p>
+            <p>{{customField2}}</p>
+            <a href="https://example.com/article2" class="read-more">Читать далее →</a>
+        </div>
+        
+        <div class="article">
+            <div class="article-date">19 января 2026</div>
+            <h2>Советы и рекомендации</h2>
+            <p>Узнайте, как максимально эффективно использовать наш сервис.</p>
+            <a href="https://example.com/article3" class="read-more">Читать далее →</a>
+        </div>
+        
+        <div class="footer">
+            <p>Вы получили это письмо, потому что подписаны на нашу рассылку</p>
+            <p>Email: {{email}}</p>
+            <p><a href="{{unsubscribeLink}}">Отписаться от рассылки</a></p>
+            <p>© 2026 Email Campaign System</p>
+        </div>
+    </div>
+</body>
+</html>

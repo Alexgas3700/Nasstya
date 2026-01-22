@@ -1,0 +1,469 @@
+{
+  "name": "Email Campaign System",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 500],
+      "notes": "Triggers every Monday at 9:00 AM"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.webhookUrl}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 700],
+      "webhookId": "email-campaign-webhook",
+      "notes": "Accepts external triggers for campaigns"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "id": "d4e5f6a7-b8c9-0123-def1-234567890123",
+      "name": "Get Mailing List",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [500, 400],
+      "notes": "Load email addresses from CSV/Excel file"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "email_template",
+              "name": "emailTemplate",
+              "value": "={{$json.template_name || 'template_example'}}",
+              "type": "string"
+            },
+            {
+              "id": "campaign_name",
+              "name": "campaignName",
+              "value": "={{$json.campaign_name || 'Default Campaign'}}",
+              "type": "string"
+            },
+            {
+              "id": "sender_email",
+              "name": "senderEmail",
+              "value": "={{$json.sender_email || 'noreply@example.com'}}",
+              "type": "string"
+            },
+            {
+              "id": "sender_name",
+              "name": "senderName",
+              "value": "={{$json.sender_name || 'Campaign Team'}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "e5f6a7b8-c9d0-1234-ef12-345678901234",
+      "name": "Set Campaign Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [500, 600]
+    },
+    {
+      "parameters": {
+        "content": "={{$json.emailContent}}",
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-2345-f123-456789012345",
+      "name": "Load Email Template",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [750, 500],
+      "notes": "Load HTML template from templates folder"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge template with recipient data\nconst items = [];\n\nfor (const item of $input.all()) {\n  const recipient = item.json;\n  let template = $node['Load Email Template'].json.data;\n  \n  // Replace placeholders in template\n  template = template.replace(/{{firstName}}/g, recipient.firstName || '');\n  template = template.replace(/{{lastName}}/g, recipient.lastName || '');\n  template = template.replace(/{{email}}/g, recipient.email || '');\n  template = template.replace(/{{customField1}}/g, recipient.customField1 || '');\n  template = template.replace(/{{customField2}}/g, recipient.customField2 || '');\n  template = template.replace(/{{unsubscribeLink}}/g, `https://example.com/unsubscribe?email=${recipient.email}`);\n  \n  items.push({\n    json: {\n      email: recipient.email,\n      firstName: recipient.firstName,\n      lastName: recipient.lastName,\n      subject: recipient.subject || $node['Set Campaign Parameters'].json.campaignName,\n      htmlContent: template,\n      senderEmail: $node['Set Campaign Parameters'].json.senderEmail,\n      senderName: $node['Set Campaign Parameters'].json.senderName\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "a7b8c9d0-e1f2-3456-1234-567890123456",
+      "name": "Merge Template with Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 500]
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4567-2345-678901234567",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1250, 500],
+      "notes": "Send emails in batches to avoid rate limits"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$json.senderEmail}}",
+        "toEmail": "={{$json.email}}",
+        "subject": "={{$json.subject}}",
+        "emailType": "html",
+        "message": "={{$json.htmlContent}}",
+        "options": {
+          "senderName": "={{$json.senderName}}"
+        }
+      },
+      "id": "c9d0e1f2-a3b4-5678-3456-789012345678",
+      "name": "Send Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1500, 400],
+      "credentials": {
+        "smtp": {
+          "id": "smtp_credentials",
+          "name": "SMTP Account"
+        }
+      },
+      "notes": "Configure SMTP credentials in n8n settings"
+    },
+    {
+      "parameters": {
+        "apiKey": "={{$credentials.sendGridApi.apiKey}}",
+        "resource": "mail",
+        "operation": "send",
+        "fromEmail": "={{$json.senderEmail}}",
+        "toEmail": "={{$json.email}}",
+        "subject": "={{$json.subject}}",
+        "emailType": "html",
+        "message": "={{$json.htmlContent}}",
+        "options": {
+          "fromName": "={{$json.senderName}}"
+        }
+      },
+      "id": "d0e1f2a3-b4c5-6789-4567-890123456789",
+      "name": "Send Email (SendGrid)",
+      "type": "n8n-nodes-base.sendGrid",
+      "typeVersion": 1,
+      "position": [1500, 600],
+      "credentials": {
+        "sendGridApi": {
+          "id": "sendgrid_credentials",
+          "name": "SendGrid API"
+        }
+      },
+      "notes": "Alternative: Use SendGrid API"
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "id": "e1f2a3b4-c5d6-7890-5678-901234567890",
+      "name": "Wait Between Batches",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1750, 500],
+      "notes": "Delay between batches to respect rate limits"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "resource": "log"
+      },
+      "id": "f2a3b4c5-d6e7-8901-6789-012345678901",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [2000, 400],
+      "notes": "Log successful sends to CSV file"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.error}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "a3b4c5d6-e7f8-9012-7890-123456789012",
+      "name": "Check for Errors",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1750, 700]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "resource": "errorLog"
+      },
+      "id": "b4c5d6e7-f8a9-0123-8901-234567890123",
+      "name": "Log Errors",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [2000, 800],
+      "notes": "Log failed sends with error details"
+    },
+    {
+      "parameters": {
+        "message": "=Campaign '{{$node['Set Campaign Parameters'].json.campaignName}}' completed. Total emails processed: {{$json.totalProcessed}}",
+        "additionalFields": {
+          "successCount": "={{$json.successCount}}",
+          "errorCount": "={{$json.errorCount}}"
+        }
+      },
+      "id": "c5d6e7f8-a9b0-1234-9012-345678901234",
+      "name": "Send Completion Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [2250, 500],
+      "notes": "Notify admin about campaign completion"
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Get Mailing List",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Campaign Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Mailing List",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Campaign Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Mailing List",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Campaign Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Mailing List": {
+      "main": [
+        [
+          {
+            "node": "Merge Template with Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Campaign Parameters": {
+      "main": [
+        [
+          {
+            "node": "Load Email Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Email Template": {
+      "main": [
+        [
+          {
+            "node": "Merge Template with Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Template with Data": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Send Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Batches",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check for Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SendGrid)": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Batches",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check for Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Between Batches": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Errors": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Send Completion Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Errors": {
+      "main": [
+        [
+          {
+            "node": "Send Completion Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2026-01-21T00:00:00.000Z",
+      "updatedAt": "2026-01-21T00:00:00.000Z",
+      "id": "1",
+      "name": "Email Marketing"
+    },
+    {
+      "createdAt": "2026-01-21T00:00:00.000Z",
+      "updatedAt": "2026-01-21T00:00:00.000Z",
+      "id": "2",
+      "name": "Automation"
+    }
+  ],
+  "triggerCount": 3,
+  "updatedAt": "2026-01-21T00:00:00.000Z",
+  "versionId": "1"
+}

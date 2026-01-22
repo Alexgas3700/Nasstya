@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Campaign</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+            color: #333333;
+            line-height: 1.6;
+        }
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #667eea;
+            font-size: 18px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            font-size: 14px;
+            color: #666666;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .social-links {
+            margin: 20px 0;
+        }
+        .social-links a {
+            display: inline-block;
+            margin: 0 10px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .unsubscribe {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #999999;
+        }
+        .unsubscribe a {
+            color: #999999;
+            text-decoration: underline;
+        }
+        @media only screen and (max-width: 600px) {
+            .content {
+                padding: 30px 20px;
+            }
+            .header h1 {
+                font-size: 24px;
+            }
+            .cta-button {
+                display: block;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 Добро пожаловать в нашу рассылку!</h1>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="greeting">
+                Здравствуйте, {{firstName}} {{lastName}}!
+            </div>
+
+            <div class="message">
+                <p>Мы рады приветствовать вас в нашей системе email-рассылок. Это пример шаблона, который демонстрирует возможности персонализации и красивого оформления писем.</p>
+                
+                <p>Ваш email: <strong>{{email}}</strong></p>
+            </div>
+
+            <!-- Call to Action -->
+            <center>
+                <a href="https://example.com/action" class="cta-button">Перейти к действию</a>
+            </center>
+
+            <!-- Info Box -->
+            <div class="info-box">
+                <h3>📌 Важная информация</h3>
+                <p>Этот шаблон поддерживает:</p>
+                <ul>
+                    <li>Персонализацию данных получателя</li>
+                    <li>Адаптивный дизайн для мобильных устройств</li>
+                    <li>Красивое оформление с градиентами</li>
+                    <li>Кастомные поля: {{customField1}}, {{customField2}}</li>
+                </ul>
+            </div>
+
+            <div class="message">
+                <p>Если у вас есть вопросы, не стесняйтесь обращаться к нам. Мы всегда рады помочь!</p>
+                
+                <p>С уважением,<br>
+                <strong>Команда Email Campaign System</strong></p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="social-links">
+                <a href="https://example.com/facebook">Facebook</a> |
+                <a href="https://example.com/twitter">Twitter</a> |
+                <a href="https://example.com/linkedin">LinkedIn</a>
+            </div>
+            
+            <p>© 2026 Email Campaign System. Все права защищены.</p>
+            
+            <p>
+                <a href="https://example.com/contact">Связаться с нами</a> |
+                <a href="https://example.com/privacy">Политика конфиденциальности</a>
+            </p>
+            
+            <div class="unsubscribe">
+                <p>Не хотите получать эти письма?<br>
+                <a href="{{unsubscribeLink}}">Отписаться от рассылки</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
